@@ -105,7 +105,13 @@ func (bucket Bucket) Upload(context context.Context, options UploadOptions) (err
 			Metadata:     metadataForFile,
 			CacheControl: aws.String(options.FileOptions[*fileKey].CacheControl),
 		})
-		file.Close()
+
+		if err != nil {
+			return err
+		}
+
+		err = file.Close()
+
 		if err != nil {
 			return err
 		}
@@ -202,7 +208,16 @@ func downloadToFile(downloader manager.Downloader, targetDirectory, bucket, key 
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
+
+	defer func() {
+		if cerr := fd.Close(); cerr != nil {
+			err = cerr
+		}
+	}()
+
+	if err != nil {
+		return err
+	}
 
 	if _, err := downloader.Download(context.TODO(), fd, &s3.GetObjectInput{Bucket: &bucket, Key: &key}); err != nil {
 		return err

@@ -70,7 +70,7 @@ or download latest release from GitHub:
 
 !!! note "Examples"
 
-    Take a look at `example` directory in the code repository
+    Take a look at `e2e/tests` directory in the code repository
 
    In the directory create:
 

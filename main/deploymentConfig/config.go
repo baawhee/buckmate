@@ -14,14 +14,14 @@ type Location struct {
 
 type FileOptions struct {
 	Metadata     map[string]string `yaml:"metadata"`
-	CacheControl string           `yaml:"cacheControl"`
+	CacheControl string            `yaml:"cacheControl"`
 }
 
 type Deployment struct {
 	Source         Location               `yaml:"source"`
 	Target         Location               `yaml:"target"`
 	ConfigBoundary string                 `yaml:"configBoundary"`
-	KeepPrevious   bool					  `yaml:"keepPrevious"`
+	KeepPrevious   bool                   `yaml:"keepPrevious"`
 	ConfigMap      map[string]string      `yaml:"configMap"`
 	FileOptions    map[string]FileOptions `yaml:"fileOptions"`
 }
@@ -30,7 +30,7 @@ func Load(env string, rootDir string) (Deployment, error) {
 	commonPath := rootDir + "/Deployment.yaml"
 	commonFile, err := util.LoadYaml(commonPath)
 	if err != nil {
-		return Deployment{}, err;
+		return Deployment{}, err
 	}
 
 	envConfig := Deployment{}
@@ -39,11 +39,11 @@ func Load(env string, rootDir string) (Deployment, error) {
 		envPath := rootDir + "/" + env + "/Deployment.yaml"
 		envFile, err := util.LoadYaml(envPath)
 		if err != nil {
-			return Deployment{}, err;
+			return Deployment{}, err
 		}
 		err = util.YamlToStruct(envFile, &envConfig)
 		if err != nil {
-			return Deployment{}, err;
+			return Deployment{}, err
 		}
 	}
 

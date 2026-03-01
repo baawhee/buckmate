@@ -49,14 +49,22 @@ func Copy(srcFile, dstFile string) error {
 		return err
 	}
 
-	defer out.Close()
+	defer func() {
+		if cerr := out.Close(); cerr != nil {
+			err = cerr
+		}
+	}()
 
 	in, err := os.Open(srcFile)
 	if err != nil {
 		return err
 	}
 
-	defer in.Close()
+	defer func() {
+		if cerr := in.Close(); cerr != nil {
+			err = cerr
+		}
+	}()
 
 	_, err = io.Copy(out, in)
 	if err != nil {
@@ -80,7 +88,7 @@ func CreateIfNotExists(dir string, perm os.FileMode) error {
 	}
 
 	if err := os.MkdirAll(dir, perm); err != nil {
-		return fmt.Errorf("Failed to create directory: '%s', error: '%s'", dir, err.Error())
+		return fmt.Errorf("failed to create directory: '%s', error: '%s'", dir, err.Error())
 	}
 
 	return nil
