@@ -76,14 +76,21 @@ buckmate apply
 			}
 		}
 
-		err = util.CopyDirectory(rootDir+"/files", tempDir)
-		if err != nil {
-			log.Fatal(err)
+		globalFilesPath := rootDir + "/files"
+		environmentFilesPath := rootDir + "/" + env + "/files/"
+
+		if util.Exists(globalFilesPath) {
+			err = util.CopyDirectory(globalFilesPath, tempDir)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
-		err = util.CopyDirectory(rootDir+"/"+env+"/files/", tempDir)
-		if err != nil {
-			log.Fatal(err)
+		if util.Exists(environmentFilesPath) {
+			err = util.CopyDirectory(environmentFilesPath, tempDir)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
 		err = util.ReplaceInFiles(tempDir, dConfig.ConfigBoundary, dConfig.ConfigMap)
