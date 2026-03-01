@@ -10,7 +10,7 @@ var rootCmd = &cobra.Command{
 	Use:     "buckmate",
 	Short:   "Deploy to S3 buckets with ease",
 	Long:    ``,
-	Version: "1.0.0",
+	Version: "1.0.1",
 	Run: func(cmd *cobra.Command, args []string) {
 		err := cmd.Help()
 		if err != nil {
