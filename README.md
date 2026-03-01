@@ -13,11 +13,13 @@ Visit [buckmate.org](https://buckmate.org) for more information!
 
 ## Testing
 
-Currently only testing in this project is a funny shell test suite. To run them you will need your own AWS buckets. If you want to do it, you will figure it out...
+Currently only testing in this project is a funny shell test suite. To run them you will need your own AWS buckets (e2e).
 
-1. Modify `example` directory to contain your bucket names
-1. `cd e2e`
-2. `sh e2h.sh`
+> Note this will override / delete content in your buckets!
+
+1. Create two buckets in AWS
+2. Replace bucket names placeholders: `cd e2e && ./replace-buckets.sh your_bucket_name_1 your_bucket_name_2`
+3. Run test suite: `./e2e.sh`
 
 ## Contributing / Code of conduct
 

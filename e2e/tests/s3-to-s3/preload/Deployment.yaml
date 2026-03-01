@@ -1,0 +1,4 @@
+source:
+  address: "./data"
+target:
+  address: "s3://BUCKET_1"

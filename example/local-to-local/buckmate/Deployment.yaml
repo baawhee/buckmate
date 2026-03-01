@@ -1,8 +1,0 @@
-source:
-  address: "../buckmate-source"
-target:
-  address: "../buckmate-target"
-configBoundary: "%%%"
-configMap:
-  paragraph: "This is common paragraph."
-  header: "This is common header."

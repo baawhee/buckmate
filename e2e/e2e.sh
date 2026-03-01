@@ -1,134 +1,172 @@
-prepare_directory_to_test () {
+#!/bin/bash
+
+#SETUP
+build() {
     cd ..
     go build
     cd e2e
+    mv ../buckmate buckmate-executable
+}
+
+setup() {
+    log_deep "STARTING"
     mkdir buckmate-test-directory
-    mv ../buckmate buckmate-test-directory/buckmate-executable
     cd buckmate-test-directory
 }
 
-compare_results () {
+cleanup() {
+    cd ..
+    rm -rf buckmate-test-directory
+}
+
+full_cleanup() {
+    rm -rf buckmate-test-directory
+    rm -rf buckmate-executable
+}
+
+compare_and_clean() {
     if diff -r "$1" "$2" --exclude=".gitignore"; then
-        echo "SUCCESS"
-        cd ../
-        rm -rf buckmate-test-directory
+        log_deep "SUCCESS"
+        cleanup
     else
-        echo "FAILURE"
+        log_deep "FAILURE"
+        cleanup
         exit 1
     fi
 }
 
-local_to_local () {
-    echo "Starting local-to-local test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-local/* ./
-    ./buckmate-executable --path buckmate apply
-    compare_results "../result" "buckmate-target"
+log() {
+    echo "${FUNCNAME[1]}: $1"
 }
 
-s3_to_s3 () {
-    echo "Starting s3-to-s3 test"
-    prepare_directory_to_test
-    cp -R ../../example/s3-to-s3/* ./
-    ./buckmate-executable --path buckmate apply
-    mkdir buckmate-target
-    aws s3 cp s3://buckmate-target buckmate-target --recursive
-    compare_results "../result" "buckmate-target"
+log_deep() {
+    echo "${FUNCNAME[2]}: $1"
 }
 
-local_to_s3 () {
-    echo "Starting local-to-s3 test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-s3/* ./
-    ./buckmate-executable --path buckmate apply
-    mkdir buckmate-target
-    aws s3 cp s3://buckmate-target buckmate-target --recursive
-    compare_results "../result" "buckmate-target"
+#TESTS
+local_to_local() {
+    setup
+    cp -R ../tests/local-to-local/* ./
+    ../buckmate-executable --path buckmate apply
+    compare_and_clean "../result" "result"
 }
 
-s3_to_local () {
-    echo "Starting s3-to-local test"
-    prepare_directory_to_test
-    cp -R ../../example/s3-to-local/* ./
-    ./buckmate-executable --path buckmate apply
-    compare_results "../result" "buckmate-target"
+s3_to_s3() {
+    setup
+    cp -R ../tests/s3-to-s3/* ./
+    ../buckmate-executable --path preload apply
+    ../buckmate-executable --path buckmate apply
+    ../buckmate-executable --path result apply
+    compare_and_clean "../result" "result/data"
 }
 
-dry_local () {
-    echo "Starting dry local run test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-local/* ./
-    result=`./buckmate-executable --path buckmate apply --dry 2>&1`
-    var_path=$(echo "$result" | awk '{for(i=1;i<=NF;i++) if($i ~ /^\/var\//) print $i}')
-    compare_results "../result" "$var_path"
+local_to_s3() {
+    setup
+    cp -R ../tests/local-to-s3/* ./
+    ../buckmate-executable --path buckmate apply
+    ../buckmate-executable --path result apply
+    compare_and_clean "../result" "result/data"
 }
 
-dry_remote () {
-    echo "Starting dry remote run test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-s3/* ./
-    result=`./buckmate-executable --path buckmate apply --dry 2>&1`
-    var_path=$(echo "$result" | awk '{for(i=1;i<=NF;i++) if($i ~ /^\/var\//) print $i}')
-    compare_results "../result" "$var_path"
+s3_to_local() {
+    setup
+    cp -R ../tests/s3-to-local/* ./
+    ../buckmate-executable --path preload apply
+    ../buckmate-executable --path buckmate apply
+    compare_and_clean "../result" "result"
 }
+
+dry_local() {
+    setup
+    cp -R ../tests/local-to-local/* ./
+    result=$(../buckmate-executable --path buckmate apply --dry 2>&1)
+    tmp_path=$(echo "$result" | awk '{for(i=1;i<=NF;i++) if($i ~ /^\/tmp\//) print $i}')
+    compare_and_clean "../result" "$tmp_path"
+}
+
+dry_remote() {
+    setup
+    cp -R ../tests/local-to-s3/* ./
+    result=$(../buckmate-executable --path buckmate apply --dry 2>&1)
+    tmp_path=$(echo "$result" | awk '{for(i=1;i<=NF;i++) if($i ~ /^\/tmp\//) print $i}')
+    compare_and_clean "../result" "$tmp_path"
+}
+
 #
-cache_control_metadata () {
-    echo "Starting local-to-s3-cache-metadata test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-s3-cache-metadata/* ./
-    ./buckmate-executable --path buckmate apply
-    aws s3api head-object --bucket buckmate-target --key index.html >> tmp1
-    aws s3api head-object --bucket buckmate-target --key common-file.json >> tmp2
+cache_control_metadata() {
+    setup
+    cp -R ../tests/local-to-s3-cache-metadata/* ./
+    ../buckmate-executable --path buckmate apply
+    aws s3api head-object --bucket BUCKET_2 --key index.html >>tmp1
+    aws s3api head-object --bucket BUCKET_2 --key common-file.json >>tmp2
     tmp1CacheControl=$(cat tmp1 | jq '.CacheControl')
     tmp1MetadataKey=$(cat tmp1 | jq '.Metadata."some-metadata-key"')
     tmp2CacheControl=$(cat tmp2 | jq '.CacheControl')
     tmp2MetadataKey=$(cat tmp2 | jq '.Metadata."some-metadata-key"')
-    if  [ "$tmp1CacheControl" != "\"no-cache\"" ]; then
-        echo "FAILURE1"
+    if [ "$tmp1CacheControl" != "\"no-cache\"" ]; then
+        log "Wrong cache control on index.html"
         exit 1
     fi
-    if  [ "$tmp1MetadataKey" != "\"some-metadata-value\"" ]; then
-        echo "FAILURE2"
+    if [ "$tmp1MetadataKey" != "\"some-metadata-value\"" ]; then
+        log "Wrong metadata on index.html"
         exit 1
     fi
-    if  [ "$tmp2CacheControl" != "null" ]; then
-        echo "FAILURE3"
+    if [ "$tmp2CacheControl" != "\"no-store\"" ]; then
+        log "Wrong cache control on common-file.json"
         exit 1
     fi
-    if  [ "$tmp2MetadataKey" != "null" ]; then
-        echo "FAILURE4"
+    if [ "$tmp2MetadataKey" != "null" ]; then
+        log "Wrong metadata on common-file.json"
         exit 1
     fi
-    cd ../
-    rm -r buckmate-test-directory
-    echo "SUCCESS"
+    cleanup
+    log "SUCCESS"
 }
 
 keep_previous_remote() {
-    echo "Starting local-to-s3-keep-previous test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-s3-keep-previous/* ./
-    ./buckmate-executable --path buckmate apply
-    mkdir buckmate-target
-    aws s3 cp s3://buckmate-keep-previous buckmate-target --recursive
-    compare_results "../result-keep-previous" "buckmate-target"
+    setup
+    cp -R ../tests/local-to-s3-keep-previous/* ./
+    ../buckmate-executable --path preload apply
+    ../buckmate-executable --path buckmate apply
+    mkdir result
+    aws s3 cp s3://BUCKET_2 result --recursive
+    compare_and_clean "../result-keep-previous" "result"
 }
 
 keep_previous_local() {
-    echo "Starting local-to-local-keep-previous test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-local-keep-previous/* ./
-    ./buckmate-executable --path buckmate apply
-    compare_results "../result-keep-previous" "buckmate-target"
+    setup
+    cp -R ../tests/local-to-local-keep-previous/* ./
+    ../buckmate-executable --path buckmate apply
+    compare_and_clean "../result-keep-previous" "result"
 }
 
 local_to_local_dev() {
-    echo "Starting local-to-local-dev test"
-    prepare_directory_to_test
-    cp -R ../../example/local-to-local/* ./
-    ./buckmate-executable --path buckmate --env dev apply
-    compare_results "../result-dev" "buckmate-target"
+    setup
+    cp -R ../tests/local-to-local/* ./
+    ../buckmate-executable --path buckmate --env dev apply
+    compare_and_clean "../result-dev" "result"
 }
+
+local_to_s3_dev() {
+    setup
+    cp -R ../tests/local-to-s3/* ./
+    ../buckmate-executable --path buckmate --env dev apply
+    ../buckmate-executable --path result apply
+    compare_and_clean "../result-dev" "result/data"
+}
+
+s3_to_s3_dev() {
+    setup
+    cp -R ../tests/s3-to-s3/* ./
+    ../buckmate-executable --path preload apply
+    ../buckmate-executable --path buckmate --env dev apply
+    ../buckmate-executable --path result apply
+    compare_and_clean "../result-dev" "result/data"
+}
+
+full_cleanup
+
+build
 
 local_to_local
 s3_to_s3
@@ -137,6 +175,10 @@ s3_to_local
 dry_local
 dry_remote
 cache_control_metadata
-keep_previous
+keep_previous_remote
 keep_previous_local
 local_to_local_dev
+local_to_s3
+s3_to_s3_dev
+
+full_cleanup
